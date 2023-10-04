@@ -194,19 +194,25 @@ void __EcsDefineComponent(EcsWorld* _world, const char* _name, uint32_t _size)
 
 #define EcsDefineComponent(world, component) __EcsDefineComponent(world, #component, sizeof(component));
 
-void __EcsSet(EcsWorld* world, EcsEntity entity, const char* component, const void* value)
+uint32_t __EcsGetComponentIndex(EcsWorld* _world, const char* _component)
 {
   uint32_t componentIndex = ~0u;
 
-  for (uint32_t i = 0; i < world->componentCount; i++)
+  for (uint32_t i = 0; i < _world->componentCount; i++)
   {
-    if (!strcmp(component, world->pComponentSets[i].name))
+    if (!strcmp(_component, _world->pComponentSets[i].name))
     {
       componentIndex = i;
       break;
     }
   }
 
+  return componentIndex;
+}
+
+void __EcsSet(EcsWorld* world, EcsEntity entity, const char* component, const void* value)
+{
+  uint32_t componentIndex = __EcsGetComponentIndex(world, component);
   if (componentIndex == ~0u)
     return;
 
@@ -262,22 +268,32 @@ void* __EcsGet(EcsWorld* world, EcsEntity entity, const char* component)
   if (!entityFound)
     return NULL;
 
-  for (uint32_t i = 0; i < world->componentCount; i++)
-  {
-    if (!strcmp(component, world->pComponentSets[i].name))
-    {
-      set = &world->pComponentSets[i];
-      break;
-    }
-  }
-
-  if (set == NULL)
+  uint32_t componentIndex = __EcsGetComponentIndex(world, component);
+  if (componentIndex == ~0u)
     return NULL;
+  set = &world->pComponentSets[componentIndex];
 
   uint32_t index = set->entityToDataIndexMap[__EcsEntityIndex(entity)];
   return &set->data[index];
 }
 
 #define EcsGet(world, entity, component) (component*)__EcsGet(world, entity, #component);
+
+void* __EcsGetComponentList(EcsWorld* _world, const char* _component, uint32_t* _count)
+{
+  uint32_t componentIndex = __EcsGetComponentIndex(_world, _component);
+  if (componentIndex == ~0u)
+  {
+    return NULL;
+  }
+
+  if (_count)
+  {
+    *_count = _world->pComponentSets[componentIndex].count;
+  }
+  return (void*)_world->pComponentSets[componentIndex].data;
+}
+
+#define EcsGetComponentList(world, component, pCount) (component*)__EcsGetComponentList(world, #component, pCount);
 
 #endif // !ECS_B_H
