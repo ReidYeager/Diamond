@@ -13,7 +13,7 @@ typedef uint32_t EcsComponentMask;
 #define ECS_INVALID_ENTITY 0
 #define ECS_COMPONENT_CAPACITY 32
 
-struct EcsComponentSet
+typedef struct EcsComponentSet
 {
   uint32_t id;
   const char* name;
@@ -22,9 +22,12 @@ struct EcsComponentSet
   uint32_t count;
   uint32_t capacity;
   char* data;
-};
 
-struct EcsWorld
+  uint32_t entityMapCapacity;
+  uint32_t* entityToDataIndexMap;
+} EcsComponentSet;
+
+typedef struct EcsWorld
 {
   uint32_t entitiesCapacity;
   uint32_t entitiesCount;
@@ -38,7 +41,7 @@ struct EcsWorld
 
   uint32_t componentCount;
   EcsComponentSet* pComponentSets;
-};
+} EcsWorld;
 
 EcsWorld* EcsInit()
 {
@@ -124,11 +127,21 @@ void EcsDestroyEntity(EcsWorld* _world, EcsEntity _entity)
   _world->availableEntitiesCount++;
 
   uint32_t entityIndex = _world->entityToIndexMap[_entity];
+
+  for (uint32_t i = 0; i < _world->componentCount; i++)
+  {
+    if (_world->pEntityMasks[entityIndex] & (1 << i))
+    {
+      _world->pComponentSets[i].entityToDataIndexMap[_entity] = ~0u;
+    }
+  }
+
   uint32_t entityTailIndex = _world->entitiesCount - 1;
   _world->pEntities[entityIndex] = _world->pEntities[entityTailIndex];
   _world->pEntityMasks[entityIndex] = _world->pEntityMasks[entityTailIndex];
   _world->entityToIndexMap[_world->pEntities[entityTailIndex]] = entityIndex;
   _world->entitiesCount--;
+
 }
 
 void __EcsDefineComponent(EcsWorld* _world, const char* _name, uint32_t _size)
@@ -154,10 +167,87 @@ void __EcsDefineComponent(EcsWorld* _world, const char* _name, uint32_t _size)
   newSet.capacity = 8;
   newSet.count = 0;
   newSet.data = (char*)malloc(_size * newSet.capacity);
+  newSet.entityMapCapacity = newSet.capacity;
+  newSet.entityToDataIndexMap = (uint32_t*)malloc(sizeof(uint32_t) * newSet.entityMapCapacity);
 
   _world->pComponentSets[newSet.id] = newSet;
+  _world->componentCount++;
 }
 
 #define EcsDefineComponent(world, component) __EcsDefineComponent(world, #component, sizeof(component));
+
+void __EcsSet(EcsWorld* world, EcsEntity entity, const char* component, const void* value)
+{
+  uint32_t componentIndex = ~0u;
+
+  for (uint32_t i = 0; i < world->componentCount; i++)
+  {
+    if (!strcmp(component, world->pComponentSets[i].name))
+    {
+      componentIndex = i;
+      break;
+    }
+  }
+
+  if (componentIndex == ~0u)
+    return;
+
+  EcsComponentSet* set = &world->pComponentSets[componentIndex];
+
+  if (set->count == set->capacity)
+  {
+    set->capacity *= 2;
+    char* newData = (char*)malloc(set->size * set->capacity);
+    memcpy(newData, set->data, set->size * set->count);
+    free(set->data);
+    set->data = newData;
+  }
+
+  if (entity > set->entityMapCapacity)
+  {
+    uint32_t oldCapacity = set->entityMapCapacity;
+
+    while (entity > set->entityMapCapacity)
+    {
+      set->entityMapCapacity *= 2;
+    }
+
+    uint32_t* newIndexMap = (uint32_t*)malloc(sizeof(uint32_t) * set->entityMapCapacity);
+    memcpy(newIndexMap, set->entityToDataIndexMap, sizeof(uint32_t) * oldCapacity);
+    free(set->entityToDataIndexMap);
+    set->entityToDataIndexMap = newIndexMap;
+  }
+
+  memcpy(set->data + (set->size * set->count), value, set->size);
+  set->entityToDataIndexMap[entity] = set->size * set->count;
+  set->count++;
+
+  world->pEntityMasks[world->entityToIndexMap[entity]] |= (1 << set->id);
+}
+
+#define EcsSetPointer(world, entity, component, valuePtr) __EcsSet(world, entity, #component, valuePtr);
+#define EcsSet(world, entity, component, ...) __EcsSet(world, entity, #component, &(component)__VA_ARGS__);
+
+void* __EcsGet(EcsWorld* world, EcsEntity entity, const char* component)
+{
+  EcsComponentSet* set = NULL;
+
+  for (uint32_t i = 0; i < world->componentCount; i++)
+  {
+    if (!strcmp(component, world->pComponentSets[i].name))
+    {
+      set = &world->pComponentSets[i];
+      break;
+    }
+  }
+
+  if (set == NULL)
+    return NULL;
+
+  uint32_t index = set->entityToDataIndexMap[entity];
+  return &set->data[index];
+}
+
+#define EcsGet(world, entity, component) (component*)__EcsGet(world, entity, #component);
 
 #endif // !ECS_B_H
