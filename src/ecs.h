@@ -11,6 +11,18 @@ typedef EcsId EcsEntity;
 typedef uint32_t EcsComponentMask;
 
 #define ECS_INVALID_ENTITY 0
+#define ECS_COMPONENT_CAPACITY 32
+
+struct EcsComponentSet
+{
+  uint32_t id;
+  const char* name;
+  uint32_t size;
+
+  uint32_t count;
+  uint32_t capacity;
+  char* data;
+};
 
 struct EcsWorld
 {
@@ -23,6 +35,9 @@ struct EcsWorld
   uint32_t availableEntitiesCapacity;
   uint32_t availableEntitiesCount;
   EcsEntity* pAvailableEntities;
+
+  uint32_t componentCount;
+  EcsComponentSet* pComponentSets;
 };
 
 EcsWorld* EcsInit()
@@ -39,6 +54,9 @@ EcsWorld* EcsInit()
   newWorld->availableEntitiesCapacity = 2;
   newWorld->availableEntitiesCount = 0;
   newWorld->pAvailableEntities = (EcsEntity*)malloc(sizeof(EcsEntity) * newWorld->availableEntitiesCapacity);
+
+  newWorld->componentCount = 0;
+  newWorld->pComponentSets = (EcsComponentSet*)malloc(sizeof(EcsComponentSet) * ECS_COMPONENT_CAPACITY);
 
   return newWorld;
 }
@@ -112,5 +130,34 @@ void EcsDestroyEntity(EcsWorld* _world, EcsEntity _entity)
   _world->entityToIndexMap[_world->pEntities[entityTailIndex]] = entityIndex;
   _world->entitiesCount--;
 }
+
+void __EcsDefineComponent(EcsWorld* _world, const char* _name, uint32_t _size)
+{
+  for (uint32_t i = 0; i < _world->componentCount; i++)
+  {
+    if (!strcmp(_name, _world->pComponentSets[i].name))
+    {
+      return;
+    }
+  }
+
+  if (_world->componentCount == 32)
+  {
+    // TODO : Log component max hit error
+    return;
+  }
+
+  EcsComponentSet newSet = { 0 };
+  newSet.id = _world->componentCount;
+  newSet.name = _name;
+  newSet.size = _size;
+  newSet.capacity = 8;
+  newSet.count = 0;
+  newSet.data = (char*)malloc(_size * newSet.capacity);
+
+  _world->pComponentSets[newSet.id] = newSet;
+}
+
+#define EcsDefineComponent(world, component) __EcsDefineComponent(world, #component, sizeof(component));
 
 #endif // !ECS_B_H
