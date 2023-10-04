@@ -6,12 +6,23 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef uint32_t EcsId;
+typedef uint64_t EcsId;
 typedef EcsId EcsEntity;
 typedef uint32_t EcsComponentMask;
 
 #define ECS_INVALID_ENTITY 0
 #define ECS_COMPONENT_CAPACITY 32
+
+#define __ECS_ENTITY_MASK_INDEX 0x00000000ffffffff
+#define __ECS_ENTITY_MASK_ITERATION 0xffffffff00000000
+
+#define __EcsEntityIndex(entity) (entity & __ECS_ENTITY_MASK_INDEX)
+
+EcsEntity __EcsEntityIncrementIteration(EcsEntity _entity)
+{
+  uint64_t iteration = (_entity >> 32) + 1;
+  return (_entity & __ECS_ENTITY_MASK_INDEX) | (iteration << 32);
+}
 
 typedef struct EcsComponentSet
 {
@@ -76,11 +87,12 @@ const EcsEntity EcsCreateEntity(EcsWorld* _world)
   {
     _world->availableEntitiesCount--;
     newEntity = _world->pAvailableEntities[_world->availableEntitiesCount];
+    newEntity = __EcsEntityIncrementIteration(newEntity);
     newIndex = _world->entitiesCount;
     _world->entitiesCount++;
     _world->pEntities[newIndex] = newEntity;
     _world->pEntityMasks[newIndex] = 0;
-    _world->entityToIndexMap[newEntity] = newIndex;
+    _world->entityToIndexMap[__EcsEntityIndex(newEntity)] = newIndex;
     return _world->pEntities[newIndex];
   }
 
@@ -109,7 +121,7 @@ const EcsEntity EcsCreateEntity(EcsWorld* _world)
   _world->entitiesCount++;
   _world->pEntities[newIndex] = newEntity;
   _world->pEntityMasks[newIndex] = 0;
-  _world->entityToIndexMap[newEntity] = newIndex;
+  _world->entityToIndexMap[__EcsEntityIndex(newEntity)] = newIndex;
 
   return newEntity;
 }
@@ -129,15 +141,15 @@ void EcsDestroyEntity(EcsWorld* _world, EcsEntity _entity)
   _world->pAvailableEntities[_world->availableEntitiesCount] = _entity;
   _world->availableEntitiesCount++;
 
-  uint32_t entityIndex = _world->entityToIndexMap[_entity];
+  uint32_t entityIndex = _world->entityToIndexMap[__EcsEntityIndex(_entity)];
 
   for (uint32_t i = 0; i < _world->componentCount; i++)
   {
     if (_world->pEntityMasks[entityIndex] & (1 << i))
     {
       EcsComponentSet* set = &_world->pComponentSets[i];
-      memcpy(&set->data[set->entityToDataIndexMap[_entity]], &set->data[set->entityToDataIndexMap[set->count - 1]], set->size);
-      set->entityToDataIndexMap[set->count - 1] = set->entityToDataIndexMap[_entity];
+      memcpy(&set->data[set->entityToDataIndexMap[__EcsEntityIndex(_entity)]], &set->data[set->entityToDataIndexMap[set->count - 1]], set->size);
+      set->entityToDataIndexMap[set->count - 1] = set->entityToDataIndexMap[__EcsEntityIndex(_entity)];
       set->count--;
     }
   }
@@ -209,11 +221,11 @@ void __EcsSet(EcsWorld* world, EcsEntity entity, const char* component, const vo
     set->data = newData;
   }
 
-  if (entity > set->entityMapCapacity)
+  if (__EcsEntityIndex(entity) > set->entityMapCapacity)
   {
     uint32_t oldCapacity = set->entityMapCapacity;
 
-    while (entity > set->entityMapCapacity)
+    while (__EcsEntityIndex(entity) > set->entityMapCapacity)
     {
       set->entityMapCapacity *= 2;
     }
@@ -225,10 +237,10 @@ void __EcsSet(EcsWorld* world, EcsEntity entity, const char* component, const vo
   }
 
   memcpy(set->data + (set->size * set->count), value, set->size);
-  set->entityToDataIndexMap[entity] = set->size * set->count;
+  set->entityToDataIndexMap[__EcsEntityIndex(entity)] = set->size * set->count;
   set->count++;
 
-  world->pEntityMasks[world->entityToIndexMap[entity]] |= (1 << set->id);
+  world->pEntityMasks[world->entityToIndexMap[__EcsEntityIndex(entity)]] |= (1 << set->id);
 }
 
 #define EcsSetPointer(world, entity, component, valuePtr) __EcsSet(world, entity, #component, valuePtr);
@@ -262,7 +274,7 @@ void* __EcsGet(EcsWorld* world, EcsEntity entity, const char* component)
   if (set == NULL)
     return NULL;
 
-  uint32_t index = set->entityToDataIndexMap[entity];
+  uint32_t index = set->entityToDataIndexMap[__EcsEntityIndex(entity)];
   return &set->data[index];
 }
 
