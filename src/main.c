@@ -5,7 +5,7 @@
 
 typedef struct Position
 {
-  float x, y, z;
+  int x, y, z;
 } Position;
 
 int main()
@@ -14,14 +14,34 @@ int main()
   if (!ecs)
     return -1;
 
-  EcsEntity a = EcsCreateEntity(ecs);
-
   EcsDefineComponent(ecs, Position);
 
-  EcsSet(ecs, a, Position, { 1, 2, 3 });
+  EcsEntity entities[8];
 
-  Position* p = EcsGet(ecs, a, Position);
-  printf("A has : %f, %f, %f\n", p->x, p->y, p->z);
+  entities[0] = EcsCreateEntity(ecs);
+  entities[1] = EcsCreateEntity(ecs);
+  entities[2] = EcsCreateEntity(ecs);
+  entities[3] = EcsCreateEntity(ecs);
+
+  EcsSet(ecs, entities[0], Position, { 1, 2, 3 });
+  EcsSet(ecs, entities[1], Position, { 4, 5, 6 });
+  EcsSet(ecs, entities[2], Position, { 7, 8, 9 });
+  EcsSet(ecs, entities[3], Position, { 10, 11, 12 });
+
+  EcsDestroyEntity(ecs, entities[1]);
+
+  entities[4] = EcsCreateEntity(ecs);
+
+  EcsSet(ecs, entities[4], Position, { 13, 14, 15 });
+
+  for (uint32_t i = 0; i < 5; i++)
+  {
+    const Position* p = EcsGet(ecs, entities[i], Position);
+    if (p)
+      printf("%d : %d, %d, %d\n", i, p->x, p->y, p->z);
+  }
+
+  
 
   return 0;
 }

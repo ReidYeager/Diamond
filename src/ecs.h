@@ -69,6 +69,9 @@ const EcsEntity EcsCreateEntity(EcsWorld* _world)
   EcsEntity newEntity = 0;
   uint32_t newIndex = 0;
 
+  // TODO : Find a different way to do entity Id's so they don't get re-used as easily
+  // Being re-used can quickly cause issues when an entity is destroyed, another takes its place
+  // but a reference to the original is later used by the user
   if (_world->availableEntitiesCount > 0)
   {
     _world->availableEntitiesCount--;
@@ -132,7 +135,10 @@ void EcsDestroyEntity(EcsWorld* _world, EcsEntity _entity)
   {
     if (_world->pEntityMasks[entityIndex] & (1 << i))
     {
-      _world->pComponentSets[i].entityToDataIndexMap[_entity] = ~0u;
+      EcsComponentSet* set = &_world->pComponentSets[i];
+      memcpy(&set->data[set->entityToDataIndexMap[_entity]], &set->data[set->entityToDataIndexMap[set->count - 1]], set->size);
+      set->entityToDataIndexMap[set->count - 1] = set->entityToDataIndexMap[_entity];
+      set->count--;
     }
   }
 
@@ -231,6 +237,18 @@ void __EcsSet(EcsWorld* world, EcsEntity entity, const char* component, const vo
 void* __EcsGet(EcsWorld* world, EcsEntity entity, const char* component)
 {
   EcsComponentSet* set = NULL;
+
+  int entityFound = 0;
+  for (uint32_t i = 0; i < world->entitiesCount; i++)
+  {
+    if (world->pEntities[i] == entity)
+    {
+      entityFound = 1;
+      break;
+    }
+  }
+  if (!entityFound)
+    return NULL;
 
   for (uint32_t i = 0; i < world->componentCount; i++)
   {
