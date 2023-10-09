@@ -1,0 +1,112 @@
+
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include <assert.h>
+#include <stdlib.h>
+
+#include "hash.h"
+
+#define HASH_MAP_DEFAULT_BUCKET_COUNT 16
+
+uint32_t HashUint(uint32_t _key)
+{
+  uint32_t hash = 0;
+
+  for (uint32_t i = 0; i < 4; i++)
+  {
+    hash = 31 * hash + ((char*)&_key)[i];
+  }
+
+  return hash;
+}
+
+HashMap* HashMapInit()
+{
+  HashMap* newMap = (HashMap*)malloc(sizeof(HashMap));
+  assert(newMap);
+
+  newMap->elementCount = 0;
+  newMap->bucketCount = HASH_MAP_DEFAULT_BUCKET_COUNT;
+  newMap->pBuckets = (HashElement**)malloc(sizeof(void*) * newMap->bucketCount);
+  assert(newMap->pBuckets);
+
+  memset(newMap->pBuckets, 0, sizeof(void*) * newMap->bucketCount);
+
+  return newMap;
+}
+
+void HashMapShutdown(HashMap* _map)
+{
+  for (uint32_t i = 0; i < _map->bucketCount; i++)
+  {
+    for (HashElement* e = _map->pBuckets[i]; e != NULL;)
+    {
+      HashElement* next = e->next;
+      free(e);
+      e = next;
+    }
+  }
+}
+
+void HashMapInsert(HashMap* _map, uint32_t _key, uint32_t _value)
+{
+  uint32_t hashKey = HashUint(_key);
+
+  HashElement* newElement = (HashElement*)malloc(sizeof(HashElement));
+  assert(newElement);
+
+  uint32_t bucketIndex = hashKey % _map->bucketCount;
+
+  newElement->key = _key;
+  newElement->keyHash = hashKey;
+  newElement->value = _value;
+  newElement->next = _map->pBuckets[bucketIndex];
+  _map->pBuckets[bucketIndex] = newElement;
+
+  _map->elementCount++;
+}
+
+void HashMapRemove(HashMap* _map, uint32_t _key)
+{
+  uint32_t hashKey = HashUint(_key);
+  uint32_t bucketIndex = hashKey % _map->bucketCount;
+
+  HashElement* prev = NULL;
+  HashElement* e = _map->pBuckets[bucketIndex];
+  while (e != NULL)
+  {
+    if (e->key == _key)
+    {
+      if (prev)
+        prev->next = e->next;
+      else
+        _map->pBuckets[bucketIndex] = e->next;
+
+      free(e);
+      break;
+    }
+
+    prev = e;
+    e = e->next;
+  }
+}
+
+uint32_t* HashMapGet(HashMap* _map, uint32_t _key)
+{
+  uint32_t hashKey = HashUint(_key);
+  uint32_t bucketIndex = hashKey % _map->bucketCount;
+
+  HashElement* e = _map->pBuckets[bucketIndex];
+  while (e != NULL)
+  {
+    if (e->key == _key)
+    {
+      return &e->value;
+    }
+
+    e = e->next;
+  }
+
+  return NULL;
+}
