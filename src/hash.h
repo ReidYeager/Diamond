@@ -7,7 +7,7 @@
 
 typedef struct HashElement
 {
-  uint32_t value;
+  void* value;
   uint32_t key;
   uint32_t keyHash;
 
@@ -17,6 +17,7 @@ typedef struct HashElement
 typedef struct HashMap
 {
   uint32_t elementCount;
+  uint32_t elementSize;
 
   // TODO : Expand buckets list when any one reaches some max chain limit
   uint32_t bucketCount;
@@ -25,8 +26,8 @@ typedef struct HashMap
 
 HashMap* HashMapInit();
 void HashMapShutdown(HashMap* _map);
-void HashMapInsert(HashMap* _map, uint32_t _key, uint32_t _value);
+void HashMapInsert(HashMap* _map, uint32_t _key, void* _value);
 void HashMapRemove(HashMap* _map, uint32_t _key);
-uint32_t* HashMapGet(HashMap* _map, uint32_t _key);
+void* HashMapGet(HashMap* _map, uint32_t _key);
 
 #endif // !ECS_HASH_MAP_H

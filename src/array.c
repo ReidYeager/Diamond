@@ -31,7 +31,7 @@ void DynamicArrayShutdown(DynamicArray* _array)
 void DynamicArrayResize(DynamicArray* _array, uint32_t _newCapacity)
 {
   assert(_newCapacity);
-  char* newData = (char*)realloc(_array->data, _array->elementSize * _newCapacity);
+  void* newData = (void*)realloc(_array->data, _array->elementSize * _newCapacity);
   assert(newData);
 
   _array->data = newData;
@@ -48,7 +48,7 @@ void DynamicArrayPushBack(DynamicArray* _array, const void* _value)
     DynamicArrayResize(_array, _array->capacity * 2);
   }
 
-  memcpy(&_array->data[_array->elementSize * _array->count], _value, _array->elementSize);
+  memcpy((char*)_array->data + (_array->elementSize * _array->count), _value, _array->elementSize);
   _array->count++;
 }
 
@@ -58,5 +58,5 @@ void* DynamicArrayPopBack(DynamicArray* _array)
     return NULL;
 
   _array->count--;
-  return &_array->data[_array->elementSize * _array->count];
+  return (char*)_array->data + (_array->elementSize * _array->count);
 }

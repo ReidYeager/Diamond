@@ -10,7 +10,7 @@ typedef struct DynamicArray
   uint32_t elementSize;
   uint32_t capacity;
   uint32_t count;
-  char* data;
+  void* data;
 } DynamicArray;
 
 DynamicArray* DynamicArrayInit(uint32_t _elementSize, uint32_t _capacity);
