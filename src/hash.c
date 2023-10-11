@@ -21,20 +21,19 @@ uint32_t HashUint(uint32_t _key)
   return hash;
 }
 
-HashMap* HashMapInit(uint32_t _elementSize)
+HashMap HashMapInit(uint32_t _elementSize)
 {
   assert(_elementSize);
 
-  HashMap* newMap = (HashMap*)malloc(sizeof(HashMap));
-  assert(newMap);
+  HashMap newMap = { 0 };
 
-  newMap->elementCount = 0;
-  newMap->elementSize = _elementSize;
-  newMap->bucketCount = HASH_MAP_DEFAULT_BUCKET_COUNT;
-  newMap->pBuckets = (HashElement**)malloc(sizeof(void*) * newMap->bucketCount);
-  assert(newMap->pBuckets);
+  newMap.elementCount = 0;
+  newMap.elementSize = _elementSize;
+  newMap.bucketCount = HASH_MAP_DEFAULT_BUCKET_COUNT;
+  newMap.pBuckets = (HashElement**)malloc(sizeof(void*) * newMap.bucketCount);
+  assert(newMap.pBuckets);
 
-  memset(newMap->pBuckets, 0, sizeof(void*) * newMap->bucketCount);
+  memset(newMap.pBuckets, 0, sizeof(void*) * newMap.bucketCount);
 
   return newMap;
 }
@@ -47,13 +46,12 @@ void HashMapShutdown(HashMap* _map)
     {
       HashElement* next = e->next;
       free(e->value);
-      free(e);
       e = next;
     }
   }
 }
 
-void HashMapInsert(HashMap* _map, uint32_t _key, void* _value)
+void* HashMapSet(HashMap* _map, uint32_t _key, void* _value)
 {
   uint32_t hashKey = HashUint(_key);
 
@@ -72,6 +70,8 @@ void HashMapInsert(HashMap* _map, uint32_t _key, void* _value)
 
   _map->pBuckets[bucketIndex] = newElement;
   _map->elementCount++;
+
+  return newElement->value;
 }
 
 void HashMapRemove(HashMap* _map, uint32_t _key)
@@ -110,7 +110,7 @@ void* HashMapGet(HashMap* _map, uint32_t _key)
   {
     if (e->key == _key)
     {
-      return &e->value;
+      return e->value;
     }
 
     e = e->next;

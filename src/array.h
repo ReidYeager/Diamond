@@ -13,10 +13,13 @@ typedef struct DynamicArray
   void* data;
 } DynamicArray;
 
-DynamicArray* DynamicArrayInit(uint32_t _elementSize, uint32_t _capacity);
+DynamicArray DynamicArrayInit(uint32_t _elementSize, uint32_t _capacity);
 void DynamicArrayShutdown(DynamicArray* _array);
 void DynamicArrayResize(DynamicArray* _array, uint32_t _newCapacity);
-void DynamicArrayPushBack(DynamicArray* _array, const void* _value);
+void* DynamicArrayPushBack(DynamicArray* _array, const void* _value);
+void* DynamicArrayPushEmpty(DynamicArray* _array);
 void* DynamicArrayPopBack(DynamicArray* _array);
+void* DynamicArrayGet(DynamicArray* _array, uint32_t _index);
+void DynamicArraySet(DynamicArray* _array, uint32_t _index, void* _value);
 
 #endif // !DYNAMIC_ARRAY_H

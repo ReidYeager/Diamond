@@ -24,10 +24,11 @@ typedef struct HashMap
   HashElement** pBuckets;
 } HashMap;
 
-HashMap* HashMapInit();
+HashMap HashMapInit(uint32_t _elementSize);
 void HashMapShutdown(HashMap* _map);
-void HashMapInsert(HashMap* _map, uint32_t _key, void* _value);
+void* HashMapSet(HashMap* _map, uint32_t _key, void* _value);
 void HashMapRemove(HashMap* _map, uint32_t _key);
 void* HashMapGet(HashMap* _map, uint32_t _key);
+#define HashMapGetAs(map, key, type) (type*)HashMapGet(map, key)
 
 #endif // !ECS_HASH_MAP_H
