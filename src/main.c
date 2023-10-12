@@ -79,14 +79,29 @@ int main()
       ((foo*)DynamicArrayGet(&arch->pComponentArrays[1], i))->z);
   }
 
-  AddComponent(e2, barComponent);
+  bar* bbar = (bar*)AddComponent(e2, barComponent);
+  bbar->a = -123454321;
   PrintEntityComponents(e2);
   RemoveComponent(e2, fooComponent);
   PrintEntityComponents(e2);
 
+  printf("tmp : %u --- bar: %d\n",
+    *(uint32_t*)GetComponent(e2, intComponent),
+    ((bar*)GetComponent(e2, barComponent))->a);
+
   DestroyEntity(e2);
 
   PrintEntityComponents(e2);
+
+  PrintAllArchetypeComponents();
+  PrintAllArchetypeEntities();
+
+
+  printf("\n\n");
+
+  PrintComponentArchetypes(intComponent);
+  PrintComponentArchetypes(fooComponent);
+  PrintComponentArchetypes(barComponent);
 
   EcsShutdown();
   return 0;

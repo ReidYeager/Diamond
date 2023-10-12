@@ -90,44 +90,16 @@ Archetype CreateArchetype(uint32_t _componentCount, ComponentId* _components)
   return newArch;
 }
 
-void RemoveRowFromArchetype(Archetype* _arch, uint32_t _index)
-{
-  if (_arch->componentTypeCount == 0)
-    return;
-
-  uint32_t tail = _arch->pComponentArrays[0].count - 1;
-
-  if (_index == tail)
-  {
-    for (uint32_t i = 0; i < _arch->componentTypeCount; i++)
-    {
-      DynamicArrayPopBack(&_arch->pComponentArrays[i]);
-    }
-  }
-
-  void* tailValue = NULL;
-  for (uint32_t i = 0; i < _arch->componentTypeCount; i++)
-  {
-    tailValue = DynamicArrayGet(&_arch->pComponentArrays[i], tail);
-    DynamicArraySet(&_arch->pComponentArrays[i], _index, tailValue);
-  }
-
-  Entity entity = *(Entity*)DynamicArrayGet(&_arch->indexToEntity, tail);
-  EntityRecord* record = (EntityRecord*)HashMapGet(&entityRecords, entity);
-  record->index = _index;
-}
-
 void* MoveRowBetweenArchetypes(Archetype* _src, Archetype* _dst, uint32_t _srcIndex)
 {
   assert(_src && _dst);
 
   bool addingRow = _src->componentTypeCount < _dst->componentTypeCount;
-  uint8_t archIsEmpty = ((_src->componentTypeCount == 0) << 0) | ((_dst->componentTypeCount == 0) << 1);
+  // Non-zero if either archetype has a component type count of 0
+  uint8_t archHasNoComponents = _src->componentTypeCount == 0 || _dst->componentTypeCount == 0;
   uint32_t rowCount = addingRow ? _dst->componentTypeCount : _src->componentTypeCount;
 
-  uint32_t srcTailIndex = 0;
-  if ((archIsEmpty & 1) == 0)
-    srcTailIndex = _src->pComponentArrays[0].count;
+  uint32_t srcTailIndex = (_src->indexToEntity.count > 0) ? _src->indexToEntity.count - 1 : 0;
 
   void* newComponentValue = NULL;
   void* srcTailValue = NULL;
@@ -135,7 +107,7 @@ void* MoveRowBetweenArchetypes(Archetype* _src, Archetype* _dst, uint32_t _srcIn
 
   for (int32_t i = 0, j = 0; i < rowCount && j < rowCount;)
   {
-    if (!archIsEmpty && _src->pComponentTypes[i] == _dst->pComponentTypes[j])
+    if (!archHasNoComponents && _src->pComponentTypes[i] == _dst->pComponentTypes[j])
     {
       copiedValue = DynamicArrayGet(&_src->pComponentArrays[i], _srcIndex);
       DynamicArrayPushBack(&_dst->pComponentArrays[j], copiedValue);
@@ -160,6 +132,14 @@ void* MoveRowBetweenArchetypes(Archetype* _src, Archetype* _dst, uint32_t _srcIn
       newComponentValue = DynamicArrayPushEmpty(&_dst->pComponentArrays[j]);
       j++;
     }
+  }
+
+  if (_src->indexToEntity.count > 0)
+  {
+    Entity srcTailEntity = *(Entity*)DynamicArrayGet(&_src->indexToEntity, srcTailIndex);
+    EntityRecord* srcTailEntityRecord = (EntityRecord*)HashMapGet(&entityRecords, srcTailEntity);
+    srcTailEntityRecord->index = _srcIndex;
+    DynamicArrayPopBack(&_src->indexToEntity);
   }
 
   return newComponentValue;
@@ -281,7 +261,6 @@ void* AddComponent(Entity _entity, ComponentId _component)
 
   record->archetype = nextArch;
   record->index = nextArch->pComponentArrays[0].count - 1;
-
   DynamicArrayPushBack(&nextArch->indexToEntity, &_entity);
 
   return valuePtr;
@@ -372,10 +351,93 @@ void PrintEntityComponents(Entity _entity)
 
   Archetype* arch = rec->archetype;
 
-  printf("Components for Entity %u : {", _entity);
+  printf("Components for Entity %u (archetype %u) : {", _entity, arch->id);
   for (uint32_t i = 0; i < arch->componentTypeCount; i++)
   {
     printf("%s%u", i == 0 ? "" : ", ", arch->pComponentTypes[i]);
   }
   printf("}\n");
+}
+
+void PrintArchetypeComponents(ArchetypeId _archId)
+{
+  Archetype* arch = (Archetype*)HashMapGet(&archetypes, _archId);
+  if (arch == NULL)
+  {
+    printf("Cannot retrieve components for invalid archetype %u\n", _archId);
+    return;
+  }
+
+  printf("  Components for Archetype %u : {", _archId);
+  for (uint32_t i = 0; i < arch->componentTypeCount; i++)
+  {
+    printf("%s%u", i == 0 ? "" : ", ", arch->pComponentTypes[i]);
+  }
+  printf("}\n");
+}
+
+void PrintArchetypeEntities(ArchetypeId _archId)
+{
+  Archetype* arch = (Archetype*)HashMapGet(&archetypes, _archId);
+  if (arch == NULL)
+  {
+    printf("Cannot retrieve components for invalid archetype %u\n", _archId);
+    return;
+  }
+
+  printf("  Entities for Archetype %u : {", _archId);
+  for (uint32_t i = 0; i < arch->indexToEntity.count; i++)
+  {
+    printf("%s%u", i == 0 ? "" : ", ", *((Entity*)DynamicArrayGet(&arch->indexToEntity, i)));
+  }
+  printf("}\n");
+}
+
+void PrintComponentArchetypes(ComponentId _component)
+{
+  ComponentInfo* cinfo = (ComponentInfo*)HashMapGet(&componentInfos, _component);
+
+  HashElement* element = NULL;
+  printf("Archetypes for Component %u : {", _component);
+  for (uint32_t i = 0, printCount = 0; i < cinfo->archetypeMap.bucketCount; i++)
+  {
+    element = cinfo->archetypeMap.pBuckets[i];
+    while (element != NULL)
+    {
+      printf("%s%u", printCount == 0 ? "" : ", ", element->key);
+      printCount++;
+      element = element->next;
+    }
+  }
+  printf("}\n");
+}
+
+void PrintAllArchetypeComponents()
+{
+  HashElement* element = NULL;
+  printf("Printing all archetype component lists :\n");
+  for (uint32_t i = 0; i < archetypes.bucketCount; i++)
+  {
+    element = archetypes.pBuckets[i];
+    while (element != NULL)
+    {
+      PrintArchetypeComponents(((Archetype*)element->value)->id);
+      element = element->next;
+    }
+  }
+}
+
+void PrintAllArchetypeEntities()
+{
+  HashElement* element = NULL;
+  printf("Printing all archetype entity lists :\n");
+  for (uint32_t i = 0; i < archetypes.bucketCount; i++)
+  {
+    element = archetypes.pBuckets[i];
+    while (element != NULL)
+    {
+      PrintArchetypeEntities(((Archetype*)element->value)->id);
+      element = element->next;
+    }
+  }
 }

@@ -52,7 +52,6 @@ void EcsShutdown();
 ArchetypeId GetArchetypeId(uint32_t _componentCount, ComponentId* _components);
 Archetype CreateArchetype(uint32_t _componentCount, ComponentId* _components);
 void DestroyArchetype(Archetype* _arch);
-void RemoveRowFromArchetype(Archetype* _arch, uint32_t _index);
 void* MoveRowBetweenArchetypes(Archetype* _src, Archetype* _dst, uint32_t _srcIndex);
 Archetype* GetArchetype(uint32_t _componentCount, ComponentId* _components);
 void ComponentAddArchetype(ComponentId _component, ArchetypeId _archId, uint32_t _archComponentIndex);
@@ -66,5 +65,9 @@ Entity CreateEntity();
 void DestroyEntity(Entity _entity);
 
 void PrintEntityComponents(Entity _entity);
+void PrintComponentArchetypes(ComponentId _component);
+void PrintAllArchetypeComponents();
+void PrintAllArchetypeEntities();
+
 
 #endif // !ECS_H
