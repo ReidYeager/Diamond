@@ -38,17 +38,31 @@ HashMap HashMapInit(uint32_t _elementSize)
   return newMap;
 }
 
-void HashMapShutdown(HashMap* _map)
+void HashMapShutdown(HashMap* _map, HashMapValueShutdownFunction _valueShutdownFunction)
 {
+  HashElement* curElement = NULL;
+  HashElement* nextElement = NULL;
+
   for (uint32_t i = 0; i < _map->bucketCount; i++)
   {
-    for (HashElement* e = _map->pBuckets[i]; e != NULL;)
+    curElement = _map->pBuckets[i];
+
+    while (curElement != NULL)
     {
-      HashElement* next = e->next;
-      free(e->value);
-      e = next;
+      nextElement = curElement->next;
+
+      if (_valueShutdownFunction)
+        _valueShutdownFunction(curElement->value);
+      free(curElement->value);
+      free(curElement);
+
+      curElement = nextElement;
+      _map->elementCount--;
     }
   }
+
+  free(_map->pBuckets);
+  _map->bucketCount = 0;
 }
 
 void* HashMapSet(HashMap* _map, uint32_t _key, void* _value)
@@ -74,7 +88,7 @@ void* HashMapSet(HashMap* _map, uint32_t _key, void* _value)
   return newElement->value;
 }
 
-void HashMapRemove(HashMap* _map, uint32_t _key)
+void HashMapRemove(HashMap* _map, uint32_t _key, HashMapValueShutdownFunction _valueShutdownFunction)
 {
   uint32_t hashKey = HashUint(_key);
   uint32_t bucketIndex = hashKey % _map->bucketCount;
@@ -90,6 +104,8 @@ void HashMapRemove(HashMap* _map, uint32_t _key)
       else
         _map->pBuckets[bucketIndex] = e->next;
 
+      if (_valueShutdownFunction)
+        _valueShutdownFunction(e->value);
       free(e->value);
       free(e);
       break;
