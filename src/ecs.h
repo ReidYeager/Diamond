@@ -63,6 +63,7 @@ void* GetComponent(Entity _entity, ComponentId _component);
 void RemoveComponent(Entity _entity, ComponentId _component);
 ComponentId DefineComponent(uint32_t _size);
 Entity CreateEntity();
+void DestroyEntity(Entity _entity);
 
 void PrintEntityComponents(Entity _entity);
 

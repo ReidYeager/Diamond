@@ -84,6 +84,10 @@ int main()
   RemoveComponent(e2, fooComponent);
   PrintEntityComponents(e2);
 
+  DestroyEntity(e2);
+
+  PrintEntityComponents(e2);
+
   EcsShutdown();
   return 0;
 }

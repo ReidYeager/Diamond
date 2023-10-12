@@ -13,6 +13,7 @@
 HashMap archetypes; // <ArchetypeId, Archetype>
 HashMap entityRecords; // <Entity, EntityRecord>
 HashMap componentInfos; // <componentId, ComponentInfo>
+uint32_t entityCount = 0;
 
 void EcsInit()
 {
@@ -337,7 +338,6 @@ ComponentId DefineComponent(uint32_t _size)
 
 Entity CreateEntity()
 {
-  static uint32_t entityCount = 0;
   entityCount++;
 
   EntityRecord newRecord = { 0 };
@@ -348,9 +348,28 @@ Entity CreateEntity()
   return entityCount;
 }
 
+void DestroyEntity(Entity _entity)
+{
+  // TODO : Recycle entity Ids
+
+  EntityRecord* record = (EntityRecord*)HashMapGet(&entityRecords, _entity);
+
+  // Remove the row from entity's current archetype
+  Archetype* emptyArch = (Archetype*)HashMapGet(&archetypes, 0);
+  MoveRowBetweenArchetypes(record->archetype, emptyArch, record->index);
+
+  HashMapRemove(&entityRecords, _entity, NULL);
+}
+
 void PrintEntityComponents(Entity _entity)
 {
   EntityRecord* rec = (EntityRecord*)HashMapGet(&entityRecords, _entity);
+  if (rec == NULL)
+  {
+    printf("Cannot retrieve components for destroyed entity %u\n", _entity);
+    return;
+  }
+
   Archetype* arch = rec->archetype;
 
   printf("Components for Entity %u : {", _entity);
