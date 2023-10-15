@@ -13,6 +13,7 @@
 HashMap archetypes; // <ArchetypeId, Archetype>
 HashMap entityRecords; // <Entity, EntityRecord>
 HashMap componentInfos; // <componentId, ComponentInfo>
+HashMap ComponentTypeToId; // <string, ComponentId>
 uint32_t entityCount = 0;
 
 void EcsInit()
@@ -20,6 +21,7 @@ void EcsInit()
   archetypes = HashMapInit(sizeof(Archetype));
   entityRecords = HashMapInit(sizeof(EntityRecord));
   componentInfos = HashMapInit(sizeof(ComponentInfo));
+  ComponentTypeToId = HashMapInit(sizeof(ComponentId));
 
   Archetype emptyArch = CreateArchetype(0, NULL);
   HashMapSet(&archetypes, 0, &emptyArch);
@@ -162,13 +164,14 @@ Archetype* BranchArchetypeAdd(Archetype* _curArch, ComponentId _component)
 {
   // TODO : Make sure the archetype doesn't already have this component
 
-  uint32_t count = _curArch->componentTypeCount + 1;
-  ComponentId* newTypes = (ComponentId*)malloc(sizeof(ComponentId) * count);
+  uint32_t newCount = _curArch->componentTypeCount + 1;
+  ComponentId* newTypes = (ComponentId*)malloc(sizeof(ComponentId) * newCount);
+  assert(newTypes);
 
   // Build new component list and maintain sorting
   ComponentId* oldTypes = _curArch->pComponentTypes;
   ComponentId heldId = _component;
-  for (uint32_t i = 0; i < count - 1; i++)
+  for (uint32_t i = 0; i < _curArch->componentTypeCount; i++)
   {
     if (oldTypes[i] < heldId)
     {
@@ -180,22 +183,22 @@ Archetype* BranchArchetypeAdd(Archetype* _curArch, ComponentId _component)
       heldId = oldTypes[i];
     }
   }
-  newTypes[count - 1] = heldId;
+  newTypes[_curArch->componentTypeCount] = heldId;
 
   // Test if this archetype already exists
-  ArchetypeId archId = GetArchetypeId(count, newTypes);
+  ArchetypeId archId = GetArchetypeId(newCount, newTypes);
   Archetype* newArchPtr = (Archetype*)HashMapGet(&archetypes, archId);
 
   if (newArchPtr == NULL)
   {
-    Archetype newArch = CreateArchetype(count, newTypes);
+    Archetype newArch = CreateArchetype(newCount, newTypes);
     newArchPtr = (Archetype*)HashMapSet(&archetypes, newArch.id, &newArch);
   }
 
   HashMapSet(&_curArch->addArchetypes, newArchPtr->id, newArchPtr);
   HashMapSet(&newArchPtr->removeArchetypes, _curArch->id, _curArch);
 
-  for (uint32_t i = 0; i < count; i++)
+  for (uint32_t i = 0; i < newCount; i++)
   {
     ComponentAddArchetype(newArchPtr->pComponentTypes[i], newArchPtr->id, i);
   }
@@ -207,12 +210,14 @@ Archetype* BranchArchetypeAdd(Archetype* _curArch, ComponentId _component)
 Archetype* BranchArchetypeRemove(Archetype* _curArch, ComponentId _component)
 {
   // TODO : Make sure the archetype actually has this component
+  if (_curArch->componentTypeCount ==  0)
+    return NULL;
 
-  uint32_t count = _curArch->componentTypeCount - 1;
-  ComponentId* newTypes = (ComponentId*)malloc(sizeof(ComponentId) * count);
+  uint32_t newCount = _curArch->componentTypeCount - 1;
+  ComponentId* newTypes = (ComponentId*)malloc(sizeof(ComponentId) * newCount);
 
   // Build new component list and maintain sorting
-  for (uint32_t i = 0, j = 0; i < count + 1; i++)
+  for (uint32_t i = 0, j = 0; i < _curArch->componentTypeCount; i++)
   {
     if (_curArch->pComponentTypes[i] == _component)
     {
@@ -224,19 +229,19 @@ Archetype* BranchArchetypeRemove(Archetype* _curArch, ComponentId _component)
   }
 
   // Test if this archetype already exists
-  ArchetypeId archId = GetArchetypeId(count, newTypes);
+  ArchetypeId archId = GetArchetypeId(newCount, newTypes);
   Archetype* newArchPtr = (Archetype*)HashMapGet(&archetypes, archId);
 
   if (newArchPtr == NULL)
   {
-    Archetype newArch = CreateArchetype(count, newTypes);
+    Archetype newArch = CreateArchetype(newCount, newTypes);
     newArchPtr = (Archetype*)HashMapSet(&archetypes, newArch.id, &newArch);
   }
 
   HashMapSet(&_curArch->addArchetypes, newArchPtr->id, newArchPtr);
   HashMapSet(&newArchPtr->removeArchetypes, _curArch->id, _curArch);
 
-  for (uint32_t i = 0; i < count; i++)
+  for (uint32_t i = 0; i < newCount; i++)
   {
     ComponentAddArchetype(newArchPtr->pComponentTypes[i], newArchPtr->id, i);
   }
@@ -244,7 +249,38 @@ Archetype* BranchArchetypeRemove(Archetype* _curArch, ComponentId _component)
   return newArchPtr;
 }
 
-void* AddComponent(Entity _entity, ComponentId _component)
+bool ArchetypeHasComponent(Archetype* arch, ComponentId component)
+{
+  uint32_t componentCount = arch->componentTypeCount;
+
+  int32_t rangeStartIndex = 0;
+  int32_t rangeEndIndex = componentCount - 1;
+  uint32_t midIndex = 0;
+  ComponentId midComponent = 0;
+
+  while (rangeStartIndex <= rangeEndIndex)
+  {
+    midIndex = ((rangeEndIndex - rangeStartIndex) / 2) + rangeStartIndex;
+    midComponent = arch->pComponentTypes[midIndex];
+
+    if (midComponent == component)
+    {
+      return true;
+    }
+    else if (midComponent > component)
+    {
+      rangeEndIndex = midIndex - 1;
+    }
+    else
+    {
+      rangeStartIndex = midIndex + 1;
+    }
+  }
+
+  return false;
+}
+
+void* DiamondEcsAddComponentById(Entity _entity, ComponentId _component)
 {
   // TODO : Make sure the entity doesn't already have the component
 
@@ -266,17 +302,18 @@ void* AddComponent(Entity _entity, ComponentId _component)
   return valuePtr;
 }
 
-void RemoveComponent(Entity _entity, ComponentId _component)
+void DiamondEcsRemoveComponent(Entity _entity, const char* name)
 {
   // TODO : Make sure the entity actually has the component
+  ComponentId component = *(ComponentId*)HashMapStringGet(&ComponentTypeToId, name);
 
   EntityRecord* record = (EntityRecord*)HashMapGet(&entityRecords, _entity);
   Archetype* curArch = record->archetype;
-  Archetype* nextArch = (Archetype*)HashMapGet(&curArch->removeArchetypes, _component);
+  Archetype* nextArch = (Archetype*)HashMapGet(&curArch->removeArchetypes, component);
 
   if (nextArch == NULL)
   {
-    nextArch = BranchArchetypeRemove(curArch, _component);
+    nextArch = BranchArchetypeRemove(curArch, component);
   }
 
   MoveRowBetweenArchetypes(curArch, nextArch, record->index);
@@ -287,10 +324,15 @@ void RemoveComponent(Entity _entity, ComponentId _component)
   DynamicArrayPushBack(&nextArch->indexToEntity, &_entity);
 }
 
-void* GetComponent(Entity _entity, ComponentId _component)
+void* DiamondEcsGetComponentById(Entity _entity, ComponentId _component)
 {
   EntityRecord* record = (EntityRecord*)HashMapGet(&entityRecords, _entity);
   Archetype* arch = record->archetype;
+
+  if (!ArchetypeHasComponent(arch, _component))
+  {
+    return NULL;
+  }
 
   ComponentInfo* cinfo = (ComponentInfo*)HashMapGet(&componentInfos, _component);
   uint32_t* vptr = (uint32_t*)HashMapGet(&cinfo->archetypeMap, arch->id);
@@ -300,8 +342,31 @@ void* GetComponent(Entity _entity, ComponentId _component)
   return DynamicArrayGet(&arch->pComponentArrays[componentIndex], record->index);
 }
 
+void* DiamondEcsGetComponent(Entity entity, const char* name)
+{
+  ComponentId component = *(ComponentId*)HashMapStringGet(&ComponentTypeToId, name);
+  return DiamondEcsGetComponentById(entity, component);
+}
+
+void DiamondEcsSetComponent(Entity entity, const char* name, const void* value)
+{
+  ComponentId component = *(ComponentId*)HashMapStringGet(&ComponentTypeToId, name);
+
+  // Get or add component to entity
+  void* componentValue = DiamondEcsGetComponentById(entity, component);
+  if (componentValue == NULL)
+  {
+    // Add component
+    componentValue = DiamondEcsAddComponentById(entity, component);
+  }
+
+  // Set the value
+  ComponentInfo* cinfo = (ComponentInfo*)HashMapGet(&componentInfos, component);
+  memcpy(componentValue, value, cinfo->size);
+}
+
 // TODO : Define a component default value?
-ComponentId DefineComponent(uint32_t _size)
+ComponentId DiamondEcsDefineComponent(const char* name, uint32_t _size)
 {
   static uint32_t componentCount = 0;
   componentCount++;
@@ -312,6 +377,8 @@ ComponentId DefineComponent(uint32_t _size)
 
   HashMapSet(&componentInfos, componentCount, &cinfo);
 
+  HashMapStringSet(&ComponentTypeToId, name, &componentCount);
+
   return componentCount;
 }
 
@@ -320,7 +387,7 @@ Entity CreateEntity()
   entityCount++;
 
   EntityRecord newRecord = { 0 };
-  newRecord.archetype = HashMapGet(&archetypes, 0); // Default empty
+  newRecord.archetype = (Archetype*)HashMapGet(&archetypes, 0); // Default empty
   newRecord.index = 0; // Doesn't matter w/ the empty archetype
 
   HashMapSet(&entityRecords, entityCount, &newRecord);

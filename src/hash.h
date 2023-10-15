@@ -29,8 +29,11 @@ typedef void(*HashMapValueShutdownFunction)(void*);
 HashMap HashMapInit(uint32_t _elementSize);
 void HashMapShutdown(HashMap* _map, HashMapValueShutdownFunction _valueShutdownFunction);
 void* HashMapSet(HashMap* _map, uint32_t _key, void* _value);
+void* HashMapStringSet(HashMap* _map, const char* _key, void* _value);
 void HashMapRemove(HashMap* _map, uint32_t _key, HashMapValueShutdownFunction _valueShutdownFunction);
+void HashMapStringRemove(HashMap* _map, const char* _key, HashMapValueShutdownFunction _valueShutdownFunction);
 void* HashMapGet(HashMap* _map, uint32_t _key);
+void* HashMapStringGet(HashMap* _map, const char* _key);
 #define HashMapGetAs(map, key, type) (type*)HashMapGet(map, key)
 
 #endif // !ECS_HASH_MAP_H

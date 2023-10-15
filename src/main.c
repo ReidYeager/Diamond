@@ -18,90 +18,37 @@ int main()
 {
   EcsInit();
 
-  ComponentId intComponent = DefineComponent(sizeof(uint32_t));
-  ComponentId fooComponent = DefineComponent(sizeof(foo));
-  ComponentId barComponent = DefineComponent(sizeof(bar));
+  EcsDefineComponent(uint32_t);
+  EcsDefineComponent(foo);
+  EcsDefineComponent(bar);
 
-  Entity e = CreateEntity();
-
-  uint32_t* v = (uint32_t*)AddComponent(e, intComponent);
-
-  *v = 1234;
-
-  printf("New value set to : %u\n", *(uint32_t*)GetComponent(e, intComponent));
-
-  foo* f = (foo*)AddComponent(e, fooComponent);
-  f->x = 10.0f;
-  f->y = 12.55f;
-  f->z = 1002.558f;
-
-  printf("tmp : %u --- foo: %f, %f, %f\n",
-    *(uint32_t*)GetComponent(e, intComponent),
-    ((foo*)GetComponent(e, fooComponent))->x,
-    ((foo*)GetComponent(e, fooComponent))->y,
-    ((foo*)GetComponent(e, fooComponent))->z);
-
-
+  Entity e1 = CreateEntity();
   Entity e2 = CreateEntity();
 
-  PrintEntityComponents(e2);
-
-  f = (foo*)AddComponent(e2, fooComponent);
-  f->x = 20.0f;
-  f->y = 22.55f;
-  f->z = 2002.558f;
-
-  PrintEntityComponents(e2);
-
-  v = (uint32_t*)AddComponent(e2, intComponent);
-
-  PrintEntityComponents(e2);
-
-  *v = 2234;
-
-  printf("tmp : %u --- foo: %f, %f, %f\n",
-    *(uint32_t*)GetComponent(e2, intComponent),
-    ((foo*)GetComponent(e2, fooComponent))->x,
-    ((foo*)GetComponent(e2, fooComponent))->y,
-    ((foo*)GetComponent(e2, fooComponent))->z);
-
-  printf("\n");
-
-  ComponentId syscomponents[2] = { intComponent, fooComponent };
-  Archetype* arch = GetArchetype(2, syscomponents);
-  uint32_t count = arch->pComponentArrays[0].count;
-  for (uint32_t i = 0; i < count; i++)
-  {
-    printf("tmp : %u --- foo: %f, %f, %f\n",
-      *(uint32_t*)DynamicArrayGet(&arch->pComponentArrays[0], i),
-      ((foo*)DynamicArrayGet(&arch->pComponentArrays[1], i))->x,
-      ((foo*)DynamicArrayGet(&arch->pComponentArrays[1], i))->y,
-      ((foo*)DynamicArrayGet(&arch->pComponentArrays[1], i))->z);
-  }
-
-  bar* bbar = (bar*)AddComponent(e2, barComponent);
-  bbar->a = -123454321;
-  PrintEntityComponents(e2);
-  RemoveComponent(e2, fooComponent);
-  PrintEntityComponents(e2);
-
-  printf("tmp : %u --- bar: %d\n",
-    *(uint32_t*)GetComponent(e2, intComponent),
-    ((bar*)GetComponent(e2, barComponent))->a);
-
-  DestroyEntity(e2);
-
-  PrintEntityComponents(e2);
-
-  PrintAllArchetypeComponents();
+  EcsSet(e1, uint32_t, {1231});
+  PrintAllArchetypeEntities();
+  EcsSet(e2, foo, { 20.0f, 22.55f, 2002.5587f });
   PrintAllArchetypeEntities();
 
+  EcsSet(e1, foo, { 10.0f, 12.55f, 1002.5587f });
+  PrintAllArchetypeEntities();
+  EcsSet(e2, uint32_t, {1114458});
+  PrintAllArchetypeEntities();
 
-  printf("\n\n");
+  EcsSet(e2, bar, {-123454321});
+  PrintAllArchetypeEntities();
 
-  PrintComponentArchetypes(intComponent);
-  PrintComponentArchetypes(fooComponent);
-  PrintComponentArchetypes(barComponent);
+  uint32_t tmpInt = *EcsGet(e2, uint32_t);
+  printf("> val e2 : %u\n", tmpInt);
+  foo tmpFoo = *EcsGet(e2, foo);
+  printf("> foo e2 : %f, %f, %f\n", tmpFoo.x, tmpFoo.y, tmpFoo.z);
+  bar tmpBar = *EcsGet(e2, bar);
+  printf("> bar e2 : %d\n", tmpBar.a);
+
+  EcsRemove(e2, foo);
+  PrintAllArchetypeEntities();
+  DestroyEntity(e1);
+  PrintAllArchetypeEntities();
 
   EcsShutdown();
   return 0;

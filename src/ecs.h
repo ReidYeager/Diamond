@@ -49,6 +49,38 @@ typedef struct ComponentInfo
 void EcsInit();
 void EcsShutdown();
 
+// =====
+// Entity
+// =====
+
+Entity CreateEntity();
+void DestroyEntity(Entity _entity);
+
+// =====
+// Component
+// =====
+
+ComponentId DiamondEcsDefineComponent(const char* name, uint32_t _size);
+void* DiamondEcsAddComponentById(Entity _entity, ComponentId _component);
+void* DiamondEcsGetComponentById(Entity _entity, ComponentId _component);
+void* DiamondEcsGetComponent(Entity _entity, const char* name);
+void DiamondEcsRemoveComponent(Entity _entity, const char* name);
+void DiamondEcsSetComponent(Entity entity, const char* name, const void* value);
+
+#define Stringify(x) #x
+#define StringifyDefine(x) Stringify(x)
+#define EcsId(thing) Diamond_Ecs_ID_##thing
+
+#define EcsDefineComponent(comp) DiamondEcsDefineComponent(StringifyDefine(EcsId(comp)), sizeof(comp))
+#define EcsSet(entity, comp, ...) DiamondEcsSetComponent(entity, StringifyDefine(EcsId(comp)), &(comp)__VA_ARGS__)
+#define EcsSetByPointer(entity, comp, valuePointer) DiamondEcsSetComponent(entity, StringifyDefine(EcsId(comp)), valuePointer)
+#define EcsGet(entity, comp) (comp*)DiamondEcsGetComponent(entity, StringifyDefine(EcsId(comp)))
+#define EcsRemove(entity, comp) DiamondEcsRemoveComponent(entity, StringifyDefine(EcsId(comp)))
+
+// =====
+// Archetype
+// =====
+
 ArchetypeId GetArchetypeId(uint32_t _componentCount, ComponentId* _components);
 Archetype CreateArchetype(uint32_t _componentCount, ComponentId* _components);
 void DestroyArchetype(Archetype* _arch);
@@ -57,12 +89,15 @@ Archetype* GetArchetype(uint32_t _componentCount, ComponentId* _components);
 void ComponentAddArchetype(ComponentId _component, ArchetypeId _archId, uint32_t _archComponentIndex);
 Archetype* BranchArchetypeAdd(Archetype* _curArch, ComponentId _component);
 Archetype* BranchArchetypeRemove(Archetype* _curArch, ComponentId _component);
-void* AddComponent(Entity _entity, ComponentId _component);
-void* GetComponent(Entity _entity, ComponentId _component);
-void RemoveComponent(Entity _entity, ComponentId _component);
-ComponentId DefineComponent(uint32_t _size);
-Entity CreateEntity();
-void DestroyEntity(Entity _entity);
+bool ArchetypeHasComponent(Archetype* arch, ComponentId component);
+
+// =====
+// System
+// =====
+
+// =====
+// Debug
+// =====
 
 void PrintEntityComponents(Entity _entity);
 void PrintComponentArchetypes(ComponentId _component);

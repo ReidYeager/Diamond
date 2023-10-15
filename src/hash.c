@@ -21,6 +21,18 @@ uint32_t HashUint(uint32_t _key)
   return hash;
 }
 
+uint32_t HashString(const char* _key)
+{
+  uint32_t hash = 0;
+
+  for (uint32_t i = 0; _key[i] != '\0'; i++)
+  {
+    hash = 31 * hash + _key[i];
+  }
+
+  return hash;
+}
+
 HashMap HashMapInit(uint32_t _elementSize)
 {
   assert(_elementSize);
@@ -88,6 +100,12 @@ void* HashMapSet(HashMap* _map, uint32_t _key, void* _value)
   return newElement->value;
 }
 
+void* HashMapStringSet(HashMap* _map, const char* _key, void* _value)
+{
+  uint32_t key = HashString(_key);
+  return HashMapSet(_map, key, _value);
+}
+
 void HashMapRemove(HashMap* _map, uint32_t _key, HashMapValueShutdownFunction _valueShutdownFunction)
 {
   uint32_t hashKey = HashUint(_key);
@@ -116,6 +134,12 @@ void HashMapRemove(HashMap* _map, uint32_t _key, HashMapValueShutdownFunction _v
   }
 }
 
+void HashMapStringRemove(HashMap* _map, const char* _key, HashMapValueShutdownFunction _valueShutdownFunction)
+{
+  uint32_t key = HashString(_key);
+  HashMapRemove(_map, key, _valueShutdownFunction);
+}
+
 void* HashMapGet(HashMap* _map, uint32_t _key)
 {
   uint32_t hashKey = HashUint(_key);
@@ -133,4 +157,10 @@ void* HashMapGet(HashMap* _map, uint32_t _key)
   }
 
   return NULL;
+}
+
+void* HashMapStringGet(HashMap* _map, const char* _key)
+{
+  uint32_t key = HashString(_key);
+  return HashMapGet(_map, key);
 }
