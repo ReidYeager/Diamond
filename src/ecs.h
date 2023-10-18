@@ -48,6 +48,7 @@ typedef struct ComponentInfo
 
 void EcsInit();
 void EcsShutdown();
+void EcsStep();
 
 // =====
 // Entity
@@ -72,7 +73,11 @@ void DiamondEcsSetComponent(Entity entity, const char* name, const void* value);
 #define EcsId(thing) Diamond_Ecs_ID_##thing
 
 #define EcsDefineComponent(comp) DiamondEcsDefineComponent(StringifyDefine(EcsId(comp)), sizeof(comp))
-#define EcsSet(entity, comp, ...) DiamondEcsSetComponent(entity, StringifyDefine(EcsId(comp)), &(comp)__VA_ARGS__)
+#define EcsSet(entity, comp, ...)                                     \
+{                                                                     \
+  comp tmp = (comp)__VA_ARGS__;                                       \
+  DiamondEcsSetComponent(entity, StringifyDefine(EcsId(comp)), &tmp); \
+}
 #define EcsSetByPointer(entity, comp, valuePointer) DiamondEcsSetComponent(entity, StringifyDefine(EcsId(comp)), valuePointer)
 #define EcsGet(entity, comp) (comp*)DiamondEcsGetComponent(entity, StringifyDefine(EcsId(comp)))
 #define EcsRemove(entity, comp) DiamondEcsRemoveComponent(entity, StringifyDefine(EcsId(comp)))
@@ -94,6 +99,34 @@ bool ArchetypeHasComponent(Archetype* arch, ComponentId component);
 // =====
 // System
 // =====
+
+typedef struct SystemIterator
+{
+  uint32_t entityCount;
+  uint32_t entityIndex;
+  Entity* entities; // All entities whose components will be iterated over
+
+  uint32_t archetypeCount;
+  Archetype* archetypes;
+
+  uint32_t componetCount;
+  ComponentId* componentIds;
+} SystemIterator;
+
+typedef void(*EcsSystemFunction)(SystemIterator* iterator);
+
+typedef struct System
+{
+  uint32_t componetCount;
+  ComponentId* componentIds;
+  EcsSystemFunction function;
+} System;
+
+void DiamondEcsDefineSystem(EcsSystemFunction function, const char* componentNames);
+void* DiamondEcsGetSystemComponent(SystemIterator* iterator, const char* componentName);
+
+#define EcsDefineSystem(function, ...) DiamondEcsDefineSystem(function, #__VA_ARGS__)
+#define EcsGetSystemComponent(iterator, comp) (comp*)DiamondEcsGetSystemComponent(iterator, StringifyDefine(EcsId(comp)));
 
 // =====
 // Debug

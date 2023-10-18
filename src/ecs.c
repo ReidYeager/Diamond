@@ -16,6 +16,8 @@ HashMap componentInfos; // <componentId, ComponentInfo>
 HashMap ComponentTypeToId; // <string, ComponentId>
 uint32_t entityCount = 0;
 
+DynamicArray systems; // System
+
 void EcsInit()
 {
   archetypes = HashMapInit(sizeof(Archetype));
@@ -23,12 +25,21 @@ void EcsInit()
   componentInfos = HashMapInit(sizeof(ComponentInfo));
   ComponentTypeToId = HashMapInit(sizeof(ComponentId));
 
+  systems = DynamicArrayInit(sizeof(System), 2);
+
   Archetype emptyArch = CreateArchetype(0, NULL);
   HashMapSet(&archetypes, 0, &emptyArch);
 }
 
 void EcsShutdown()
 {
+  for (uint32_t i = 0; i < systems.count; i++)
+  {
+    System* sys = (System*)DynamicArrayGet(&systems, i);
+    free(sys->componentIds);
+  }
+  DynamicArrayShutdown(&systems);
+
   HashMapShutdown(&archetypes, (HashMapValueShutdownFunction)DestroyArchetype);
   HashMapShutdown(&entityRecords, NULL);
   HashMapShutdown(&componentInfos, NULL);
@@ -507,4 +518,93 @@ void PrintAllArchetypeEntities()
       element = element->next;
     }
   }
+}
+
+void EcsStep()
+{
+  // Run all systems
+  uint32_t systemCount = systems.count;
+  SystemIterator iterator = { 0 };
+  System* curSystem = NULL;
+  iterator.archetypeCount = 0;
+
+  for (uint32_t systemIndex = 0; systemIndex < systemCount; systemIndex++)
+  {
+    // Build the iterator
+
+    // Call the iterator function for each component set found
+    curSystem = (System*)DynamicArrayGet(&systems, systemIndex);
+    curSystem->function(&iterator);
+  }
+}
+
+void ExtractComponentIdsFromDefineString(const char* inString, uint32_t* outCount, ComponentId** outIds)
+{
+  *outCount = 0;
+
+  const char* nameStart = inString;
+  const char* nameEnd = inString;
+  char nameBuffer[256] = { 'D', 'i', 'a', 'm', 'o', 'n', 'd', '_', 'E', 'c', 's', '_', 'I', 'D', '_'};
+  uint32_t nameLength = 0;
+
+  DynamicArray systemComponentIds = DynamicArrayInit(sizeof(ComponentId), 2);
+
+  while (*nameStart != '\0')
+  {
+    while (*nameEnd != '\0' && *nameEnd != ',' && *nameEnd != ' ')
+    {
+      nameEnd++;
+    }
+
+    if (nameStart != nameEnd)
+    {
+      nameLength = nameEnd - nameStart;
+      memcpy(nameBuffer + 15, nameStart, nameLength);
+      nameBuffer[nameLength + 15] = '\0';
+
+      printf("System adding component [%s]\n", nameBuffer);
+      ComponentId* newId = (ComponentId*)HashMapStringGet(&ComponentTypeToId, nameBuffer);
+      DynamicArrayPushBack(&systemComponentIds, newId);
+    }
+
+    nameStart = nameEnd + 1;
+    nameEnd++;
+  }
+
+  uint32_t idsCount = systemComponentIds.count;
+  ComponentId* idsArray = (ComponentId*)malloc(sizeof(ComponentId) * idsCount);
+  memcpy(idsArray, systemComponentIds.data, sizeof(ComponentId) * idsCount);
+
+  *outCount = idsCount;
+  *outIds = idsArray;
+
+  DynamicArrayShutdown(&systemComponentIds);
+}
+
+void DiamondEcsDefineSystem(EcsSystemFunction function, const char* componentNames)
+{
+  System newSystem = { 0 };
+
+  ExtractComponentIdsFromDefineString(componentNames, &newSystem.componetCount, &newSystem.componentIds);
+  if (newSystem.componetCount == 0)
+  {
+    // TODO : Fatal failure
+    return;
+  }
+
+  for (uint32_t i = 0; i < newSystem.componetCount; i++)
+  {
+    printf("Component[%u] = %u\n", i, newSystem.componentIds[i]);
+  }
+
+  newSystem.function = function;
+
+  DynamicArrayPushBack(&systems, &newSystem);
+}
+
+void* DiamondEcsGetSystemComponent(SystemIterator* iterator, const char* componentName)
+{
+  
+
+  return NULL;
 }
