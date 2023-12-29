@@ -1,141 +1,130 @@
+#pragma once
 
-#ifndef ECS_H
-#define ECS_H
+// Implementation of an Entity-Component-System archetecture
+// Revolves around the idea of component "archetypes"
+// Archetypes may only contain one instance of each component
+//
+// TODO : Rewrite to better utilize memory.
+// > Currently requires 2^n archetypes for an entity with n components attached
 
+#include "containers/stepvector.h"
+
+#include <array>
+#include <memory>
+#include <unordered_map>
+#include <vector>
+#include <queue>
+#include <deque>
+#include <string>
 #include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <assert.h>
-#include <string.h>
 
-#include "array.h"
-#include "hash.h"
-
-#pragma warning(disable:6387)
-#pragma warning(disable:6386)
-#pragma warning(disable:6011)
-
-typedef uint32_t EcsId;
-typedef EcsId Entity;
-typedef EcsId ComponentId;
-typedef EcsId ArchetypeId;
-
-typedef struct Archetype
+namespace Diamond
 {
-  const uint32_t componentTypeCount;
-  ComponentId* pComponentTypes;
-  DynamicArray* pComponentArrays;
-  DynamicArray indexToEntity;
 
-  HashMap addArchetypes; // <ComponentId, Archetype*>
-  HashMap removeArchetypes; // <ComponentId, Archetype*>
+#define DMD_PRINT(message, ...) printf(message"\n", __VA_ARGS__)
 
-  ArchetypeId id;
-} Archetype;
+typedef uint32_t ArchetypeId;
+typedef uint32_t ComponentId;
+typedef uint32_t Entity;
 
-typedef struct EntityRecord
+struct EcsArchetype
 {
-  Archetype* archetype;
-  uint32_t index; // Index of this entity's components in the archetype's component arrays
-} EntityRecord;
+  ArchetypeId id;                           // Hash of constituent componentId's
+  std::vector<Entity> owningEntities;       // Entity that "owns" each index
+  std::vector<ComponentId> componentIds;    // For initializing subtractional edges
 
-typedef struct ComponentInfo
+  // TODO : Profile interleaved component data vs separate comonent arrays
+  Diamond::StepVector componentData;         // Memory for all components' data interleaved for each entity
+  std::unordered_map<ComponentId, uint32_t> componentDataOffsets;
+
+  std::unordered_map<ComponentId, EcsArchetype*> additionalEdges;    // Archetypes with 'ComponentId' added
+  std::unordered_map<ComponentId, EcsArchetype*> subtractionalEdges; // Archetypes with 'ComponentId' removed
+};
+
+struct EcsRecord
 {
-  uint32_t size;
-  HashMap archetypeMap; // <Archetype*, uint32_t (component array index)>
-} ComponentInfo;
+  EcsArchetype* archetype;
+  uint32_t index;
+};
 
-void EcsInit();
-void EcsShutdown();
-void EcsStep();
-
-// =====
-// Entity
-// =====
-
-Entity CreateEntity();
-void DestroyEntity(Entity _entity);
-
-// =====
-// Component
-// =====
-
-ComponentId DiamondEcsDefineComponent(const char* name, uint32_t _size);
-void* DiamondEcsAddComponentById(Entity _entity, ComponentId _component);
-void* DiamondEcsGetComponentById(Entity _entity, ComponentId _component);
-void* DiamondEcsGetComponent(Entity _entity, const char* name);
-void DiamondEcsRemoveComponent(Entity _entity, const char* name);
-void DiamondEcsSetComponent(Entity entity, const char* name, const void* value);
-
-#define Stringify(x) #x
-#define StringifyDefine(x) Stringify(x)
-#define EcsId(thing) Diamond_Ecs_ID_##thing
-
-#define EcsDefineComponent(comp) DiamondEcsDefineComponent(StringifyDefine(EcsId(comp)), sizeof(comp))
-#define EcsSet(entity, comp, ...)                                     \
-{                                                                     \
-  comp tmp = (comp)__VA_ARGS__;                                       \
-  DiamondEcsSetComponent(entity, StringifyDefine(EcsId(comp)), &tmp); \
-}
-#define EcsSetByPointer(entity, comp, valuePointer) DiamondEcsSetComponent(entity, StringifyDefine(EcsId(comp)), valuePointer)
-#define EcsGet(entity, comp) (comp*)DiamondEcsGetComponent(entity, StringifyDefine(EcsId(comp)))
-#define EcsRemove(entity, comp) DiamondEcsRemoveComponent(entity, StringifyDefine(EcsId(comp)))
-
-// =====
-// Archetype
-// =====
-
-ArchetypeId GetArchetypeId(uint32_t _componentCount, ComponentId* _components);
-Archetype CreateArchetype(uint32_t _componentCount, ComponentId* _components);
-void DestroyArchetype(Archetype* _arch);
-void* MoveRowBetweenArchetypes(Archetype* _src, Archetype* _dst, uint32_t _srcIndex);
-Archetype* GetArchetype(uint32_t _componentCount, ComponentId* _components);
-void ComponentAddArchetype(ComponentId _component, ArchetypeId _archId, uint32_t _archComponentIndex);
-Archetype* BranchArchetypeAdd(Archetype* _curArch, ComponentId _component);
-Archetype* BranchArchetypeRemove(Archetype* _curArch, ComponentId _component);
-bool ArchetypeHasComponent(Archetype* arch, ComponentId component);
-
-// =====
-// System
-// =====
-
-typedef struct SystemIterator
+class EcsWorld
 {
-  uint32_t entityCount;
-  uint32_t entityIndex;
-  Entity* entities; // All entities whose components will be iterated over
+public:
+  friend class EcsIterator;
 
-  uint32_t archetypeCount;
-  Archetype* archetypes;
+  EcsWorld();
+  ~EcsWorld();
 
-  uint32_t componetCount;
-  ComponentId* componentIds;
-} SystemIterator;
+  Entity CreateEntity();
+  void DestroyEntity(Entity e);
 
-typedef void(*EcsSystemFunction)(SystemIterator* iterator);
+  ComponentId GetComponentId(const char* name);
+  ComponentId DefineComponent(const char* name, uint32_t size);
+  void* AddComponent(Entity e, ComponentId id);
+  void* SetComponent(Entity e, ComponentId id, const void* data);
+  void RemoveComponent(Entity e, ComponentId id);
+  bool EntityHasComponent(Entity e, ComponentId id);
 
-typedef struct System
+  void PrintNextEdges();
+  void PrintPrevEdges();
+  void PrintArchOwners();
+
+private:
+  Entity m_nextEntity = 1; // Entity value 0 invalid
+  ComponentId m_nextComponentId = 1; // ComponentId value 0 invalid
+  std::unordered_map<ComponentId, std::string> m_componentNames;
+  std::unordered_map<ComponentId, uint32_t> m_componentSizes;
+  std::unordered_map<ArchetypeId, EcsArchetype> m_archetypes;
+  std::unordered_map<Entity, EcsRecord> m_records; // NOTE : Could probably just be an array depending upon how Entity is structured
+
+  ArchetypeId GetArchetypeId(const std::vector<ComponentId>& components);
+  bool ArchetypeHasComponent(EcsArchetype* arch, ComponentId id);
+  EcsArchetype* CreateArchetype(const std::vector<ComponentId>& components);
+  EcsArchetype* GetArchetypeNext(EcsArchetype* arch, ComponentId id);
+  EcsArchetype* GetArchetypePrevious(EcsArchetype* arch, ComponentId id);
+  void* GetComponentData(EcsRecord* record, ComponentId id);
+};
+
+class EcsIterator
 {
-  uint32_t componetCount;
-  ComponentId* componentIds;
-  EcsSystemFunction function;
-} System;
+public:
+  EcsIterator(EcsWorld* world, const std::vector<ComponentId>& components) : m_world(world), m_components(components)
+  {
+    if (components.size() == 0)
+    {
+      return;
+    }
 
-void DiamondEcsDefineSystem(EcsSystemFunction function, const char* componentNames);
-void* DiamondEcsGetSystemComponent(SystemIterator* iterator, const char* componentName);
+    ArchetypeId startArchId = world->GetArchetypeId(m_components);
+    if (!world->m_archetypes.contains(startArchId))
+    {
+      return;
+    }
 
-#define EcsDefineSystem(function, ...) DiamondEcsDefineSystem(function, #__VA_ARGS__)
-#define EcsGetSystemComponent(iterator, comp) (comp*)DiamondEcsGetSystemComponent(iterator, StringifyDefine(EcsId(comp)));
+    m_currentArch = &world->m_archetypes[startArchId];
 
-// =====
-// Debug
-// =====
+    SetupCurrentArch();
+  }
 
-void PrintEntityComponents(Entity _entity);
-void PrintComponentArchetypes(ComponentId _component);
-void PrintAllArchetypeComponents();
-void PrintAllArchetypeEntities();
+  bool StepNextElement();
+  bool AtEnd();
 
+  Entity CurrentEntity();
 
-#endif // !ECS_H
+  void* GetComponent(ComponentId id);
+
+private:
+  EcsWorld* m_world;
+  const std::vector<ComponentId> m_components;
+
+  std::deque<EcsArchetype*> m_currentLayerQueue, m_nextLayerQueue;
+  EcsArchetype* m_currentArch;
+  uint32_t m_currentArchElementIndex;
+
+  void SetupCurrentArch();
+};
+
+// TODO : Iterator that traverses archetypes for use by systems
+
+} // namespace Diamond
