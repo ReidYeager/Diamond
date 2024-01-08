@@ -122,13 +122,24 @@ public:
       return;
     }
 
-    m_currentArch = &world->m_archetypes[startArchId];
+    m_startArch = &world->m_archetypes[startArchId];
+    m_currentArch = m_startArch;
 
     SetupCurrentArch();
   }
 
   bool StepNextElement();
   bool AtEnd();
+
+  void ReturnToStart()
+  {
+    m_currentArch = m_startArch;
+    m_currentLayerQueue.clear();
+    m_nextLayerQueue.clear();
+    m_currentArchElementIndex = 0;
+
+    SetupCurrentArch();
+  }
 
   Entity CurrentEntity();
 
@@ -141,6 +152,8 @@ private:
   std::deque<EcsArchetype*> m_currentLayerQueue, m_nextLayerQueue;
   EcsArchetype* m_currentArch;
   uint32_t m_currentArchElementIndex;
+
+  EcsArchetype* m_startArch;
 
   void SetupCurrentArch();
 };

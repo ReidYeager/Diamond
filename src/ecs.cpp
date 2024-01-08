@@ -88,6 +88,11 @@ ComponentId EcsWorld::DefineComponent(const char* name, uint32_t size)
 
 void* EcsWorld::AddComponent(Entity e, ComponentId id)
 {
+  if (m_componentSizes.find(id) == m_componentSizes.end())
+  {
+    assert(false && "Component not defined");
+  }
+
   EcsRecord* record = &m_records[e];
   EcsArchetype* src = record->archetype;
   EcsArchetype* dst = GetArchetypeNext(record->archetype, id);
