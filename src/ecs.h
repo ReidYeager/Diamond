@@ -63,8 +63,10 @@ public:
   ComponentId DefineComponent(const char* name, uint32_t size);
   void* AddComponent(Entity e, ComponentId id);
   void* SetComponent(Entity e, ComponentId id, const void* data);
+  void* GetComponent(Entity e, ComponentId id);
   void RemoveComponent(Entity e, ComponentId id);
   bool EntityHasComponent(Entity e, ComponentId id);
+  bool EntityIsAlive(Entity e);
 
   void PrintNextEdges();
   void PrintPrevEdges();
@@ -96,9 +98,27 @@ public:
       return;
     }
 
-    ArchetypeId startArchId = world->GetArchetypeId(m_components);
+    std::vector<ComponentId> ids(components);
+
+    for (uint32_t i = 0; i < ids.size() - 1; i++)
+    {
+      for (uint32_t j = i + 1; j < ids.size(); j++)
+      {
+        if (ids[i] > ids[j])
+        {
+          ComponentId tmp = ids[j];
+          ids[j] = ids[i];
+          ids[i] = tmp;
+        }
+      }
+    }
+
+    ArchetypeId startArchId = world->GetArchetypeId(ids);
     if (!world->m_archetypes.contains(startArchId))
     {
+      m_currentArch = nullptr;
+      m_currentLayerQueue.clear();
+      m_nextLayerQueue.clear();
       return;
     }
 

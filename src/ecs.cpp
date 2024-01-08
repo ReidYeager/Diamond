@@ -28,7 +28,6 @@ ComponentId EcsWorld::GetComponentId(const char* name)
 ArchetypeId EcsWorld::GetArchetypeId(const std::vector<ComponentId>& components)
 {
   // TODO : Sort the component list
-
   uint32_t hash = 0;
   for (uint32_t i = 0; i < components.size(); i++)
   {
@@ -159,13 +158,30 @@ void* EcsWorld::SetComponent(Entity e, ComponentId id, const void* data)
   {
     componentData = AddComponent(e, id);
   }
+  else
+  {
+    componentData = GetComponent(e, id);
+  }
 
-  if (data != nullptr)
+  if (data != nullptr && componentData != nullptr)
   {
     memcpy(componentData, data, m_componentSizes[id]);
   }
 
   return componentData;
+}
+
+void* EcsWorld::GetComponent(Entity e, ComponentId id)
+{
+  void* componentData = nullptr;
+  if (!EntityHasComponent(e, id))
+  {
+    return nullptr;
+  }
+
+  EcsRecord* record = &m_records[e];
+  uint32_t offset = record->archetype->componentDataOffsets[id];
+  return record->archetype->componentData.GetSubElement(record->index, offset);
 }
 
 void EcsWorld::RemoveComponent(Entity e, ComponentId id)
