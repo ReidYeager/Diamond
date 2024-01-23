@@ -509,6 +509,11 @@ void* EcsIterator::GetComponent(ComponentId id)
   return m_currentArch->componentData.GetSubElement(m_currentArchElementIndex, m_currentArch->componentDataOffsets[id]);
 }
 
+bool EcsIterator::HasComponent(ComponentId id)
+{
+  return std::find(m_currentArch->componentIds.begin(), m_currentArch->componentIds.end(), id) != m_currentArch->componentIds.end();
+}
+
 void EcsIterator::SetupCurrentArch()
 {
   std::deque<EcsArchetype*>::iterator iter;

@@ -144,6 +144,7 @@ public:
   Entity CurrentEntity();
 
   void* GetComponent(ComponentId id);
+  bool HasComponent(ComponentId id);
 
 private:
   EcsWorld* m_world;
