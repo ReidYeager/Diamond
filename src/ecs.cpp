@@ -11,7 +11,10 @@ EcsWorld::EcsWorld()
 
 EcsWorld::~EcsWorld()
 {
-  
+  m_componentNames.clear();
+  m_componentSizes.clear();
+  m_archetypes.clear();
+  m_records.clear();
 }
 
 ComponentId EcsWorld::GetComponentId(const char* name)
@@ -70,7 +73,29 @@ Entity EcsWorld::CreateEntity()
 
 void EcsWorld::DestroyEntity(Entity e)
 {
-  
+  EcsRecord* record = &m_records[e];
+  EcsArchetype* arch = record->archetype;
+  uint32_t index = record->index;
+  uint32_t backIndex = arch->owningEntities.size() - 1;
+  Entity backEntity = arch->owningEntities[backIndex];
+
+  if (backIndex >= 0)
+  {
+    if (arch->componentData.elementCount() > 0 && backEntity != e)
+    {
+      EcsRecord* backRecord = &m_records[backEntity];
+
+      void* data = arch->componentData[index];
+      void* backData = arch->componentData[backIndex];
+      memcpy(data, backData, arch->componentData.elementSize());
+
+      arch->owningEntities[index] = backEntity;
+      backRecord->index = index;
+    }
+
+    arch->componentData.PopBack();
+    arch->owningEntities.pop_back();
+  }
 }
 
 // ==========================================================================================
