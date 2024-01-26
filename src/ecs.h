@@ -91,11 +91,22 @@ private:
 class EcsIterator
 {
 public:
-  EcsIterator(EcsWorld* world, const std::vector<ComponentId>& components) : m_world(world), m_components(components)
+  EcsIterator() : m_isValid(false) {}
+
+  EcsIterator(EcsWorld* world, const std::vector<ComponentId>& components)
   {
+    Init(world, components);
+  }
+
+  bool Init(EcsWorld* world, const std::vector<ComponentId>& components)
+  {
+    m_isValid = false;
+    m_world = world;
+    m_components = std::vector<ComponentId>(components);
+
     if (components.size() == 0)
     {
-      return;
+      return false;
     }
 
     std::vector<ComponentId> ids(components);
@@ -119,13 +130,16 @@ public:
       m_currentArch = nullptr;
       m_currentLayerQueue.clear();
       m_nextLayerQueue.clear();
-      return;
+      return false;
     }
 
     m_startArch = &world->m_archetypes[startArchId];
     m_currentArch = m_startArch;
 
     SetupCurrentArch();
+
+    m_isValid = true;
+    return true;
   }
 
   bool StepNextElement();
@@ -147,8 +161,9 @@ public:
   bool HasComponent(ComponentId id);
 
 private:
+  bool m_isValid = false;
   EcsWorld* m_world;
-  const std::vector<ComponentId> m_components;
+  std::vector<ComponentId> m_components;
 
   std::deque<EcsArchetype*> m_currentLayerQueue, m_nextLayerQueue;
   EcsArchetype* m_currentArch;
