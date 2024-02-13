@@ -44,6 +44,7 @@ struct EcsArchetype
 
 struct EcsRecord
 {
+  bool isEnabled;
   EcsArchetype* archetype;
   uint32_t index;
 };
@@ -58,6 +59,8 @@ public:
 
   Entity CreateEntity();
   void DestroyEntity(Entity e);
+  bool GetEntityEnabled(Entity e);
+  void SetEntityEnabled(Entity e, bool enable);
 
   ComponentId GetComponentId(const char* name);
   ComponentId DefineComponent(const char* name, uint32_t size);

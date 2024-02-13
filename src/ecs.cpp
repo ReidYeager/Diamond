@@ -65,6 +65,7 @@ Entity EcsWorld::CreateEntity()
   EcsRecord* record = &m_records[m_nextEntity];
   record->archetype = &m_archetypes[0];
   record->index = 0;
+  record->isEnabled = true;
 
   record->archetype->owningEntities.push_back(m_nextEntity);
 
@@ -96,6 +97,16 @@ void EcsWorld::DestroyEntity(Entity e)
     arch->componentData.PopBack();
     arch->owningEntities.pop_back();
   }
+}
+
+bool EcsWorld::GetEntityEnabled(Entity e)
+{
+  return m_records[e].isEnabled;
+}
+
+void EcsWorld::SetEntityEnabled(Entity e, bool enable)
+{
+  m_records[e].isEnabled = enable;
 }
 
 // ==========================================================================================
@@ -490,6 +501,14 @@ bool EcsIterator::StepNextElement()
 
     SetupCurrentArch();
   }
+  else
+  {
+    Entity e = m_currentArch->owningEntities[m_currentArchElementIndex];
+    if (!m_world->GetEntityEnabled(e))
+    {
+      return StepNextElement();
+    }
+  }
 
   return AtEnd();
 }
@@ -526,7 +545,7 @@ void EcsIterator::SetupCurrentArch()
     }
   }
 
-  if (m_currentArch->owningEntities.size() == 0)
+  if (m_currentArch->owningEntities.size() == 0 || !m_world->GetEntityEnabled(m_currentArch->owningEntities[0]))
   {
     StepNextElement();
     return;
